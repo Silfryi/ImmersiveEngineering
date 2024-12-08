@@ -27,6 +27,7 @@ import net.minecraft.world.item.enchantment.ProtectionEnchantment;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -40,6 +41,7 @@ import java.util.*;
 public class DirectionalMiningExplosion extends Explosion
 {
 	private static final int SIZE = 8;
+	private static final int SCAN = SIZE-1;
 	private static final float BLASTING_LENGTH = 150;
 	private static final float SUBSURFACE_LENGTH = 300;
 	private static final int THIRD_VOLUME = (int)((1.0/3)*(4.0/3)*Math.PI*SIZE*SIZE*SIZE);
@@ -79,47 +81,36 @@ public class DirectionalMiningExplosion extends Explosion
 	{
 		// variables used for the rest of the explosion
 		Vec3 center = center();
-		BlockPos centerBlock = new BlockPos((int)(center.x)+(center.x<0?-1:0), (int)center.y, (int)(center.z)+(center.z<0?-1:0));
+		BlockPos centerBlock = new BlockPos((int)(center.x-0.5f), (int)(center.y-0.5f), (int)(center.z-0.5f));
 		// iteration to identify the basic characteristics of the explosion
 		// variables collated during the iteration
-		double totalResistance = 0;
 		int totalBlocks = 0;
-		Vec3 weaknesses = new Vec3(0,0, 0);
 		Vec3 openSpace =  new Vec3(0,0, 0);
 		BlockState cBlock;
 		FluidState cFluid;
-		// iterate over an area of size (2*power+1)^3 and collect the resistance of blocks in a sphere around our center
-		for (int x=-SIZE;x<=SIZE;x++)
-			for (int y=-SIZE;y<=SIZE;y++)
-				for (int z=-SIZE;z<=SIZE;z++)
+		// iterate over an area of size (2*(power-1)+1)^3 and collect the resistance of blocks in a sphere around our center
+		for (int x=-SCAN;x<=SCAN;x++)
+			for (int y=-SCAN;y<=SCAN;y++)
+				for (int z=-SCAN;z<=SCAN;z++)
 				{
 					BlockPos pos = centerBlock.offset(x, y, z);
-					if (new Vec3(x, y, z).length()<=SIZE)
+					if (new Vec3(x, y, z).length()<=SCAN)
 					{
 						cBlock = world.getBlockState(pos);
 						cFluid = world.getFluidState(pos);
 						if(!cBlock.isAir()||!cFluid.isEmpty())
-						{
-							float resistance = cBlock.getExplosionResistance(world, pos, this)+cFluid.getExplosionResistance(world, pos, this);
-							totalResistance += resistance;
 							totalBlocks+=1;
-							weaknesses = weaknesses.add(x==0?0:resistance/x, y==0?0:resistance/y, z==0?0:resistance/z);
-						}
 						if(cBlock.canBeReplaced()&&cFluid.isEmpty())
-							openSpace = openSpace.add(x==0?0:1.0/x, y==0?0:1.0/y, z==0?0:1.0/z);
+							openSpace = openSpace.add(x == 0 ? 0 : 1.0 / x, y == 0 ? 0 : 1.0 / y, z == 0 ? 0 : 1.0 / z);
 					}
 				}
 		// establish the weakest direction and the length of the explosive step we should be taking
-		weaknesses = weaknesses.reverse();
-		Vec3 propagationDirection = openSpace;
-		propagationDirection = propagationDirection.add(weaknesses.scale(0.05));
-		Vec3 step = propagationDirection.scale((0.5*SIZE+1-Math.sqrt(propagationDirection.length()/SIZE))/propagationDirection.length());
-		System.out.println(step + " " + openSpace.scale((0.5*SIZE+1-Math.sqrt(openSpace.length()/SIZE))/openSpace.length())  + " " + weaknesses + " " + openSpace + " " + propagationDirection);
+		Vec3 step = openSpace.scale((0.5*SIZE+1-Math.sqrt(openSpace.length()/SIZE))/openSpace.length());
 		// handle explosion based on criteria for explosions: either surface, subsurface, or blasting
 		int air = checkAir(centerBlock);
-		if(air<MIN_AIR&&propagationDirection.length()<BLASTING_LENGTH&&totalBlocks>=THIRD_VOLUME)
+		if(air<MIN_AIR&&openSpace.length()<BLASTING_LENGTH&&totalBlocks>=THIRD_VOLUME)
 			stagedExplosionDetonation(centerBlock, step, 0.4f * SIZE, 0.4f * SIZE, MAX_BLASTING_RESISTANCE, true);
-		else if(air<=MIN_AIR&&propagationDirection.length()<SUBSURFACE_LENGTH&&totalBlocks>=THIRD_VOLUME)
+		else if(air<=MIN_AIR&&openSpace.length()<SUBSURFACE_LENGTH&&totalBlocks>=THIRD_VOLUME)
 			stagedExplosionDetonation(centerBlock, null, 3, SIZE*1.25f, MAX_SUBSURFACE_RESISTANCE, false);
 		else
 			stagedExplosionDetonation(centerBlock, null, 2, SIZE*2, MAX_SURFACE_RESISTANCE, false);
@@ -190,6 +181,13 @@ public class DirectionalMiningExplosion extends Explosion
 		}
 	}
 
+	/**
+	 * This method removes a block that was exploded by a DirectionalMiningExplosion, including BEs and special blocks
+	 * BE drops are dropped alongside the other block drops, and are all popped without silk touch
+	 * @param pos BlockPos position at which to remove the block
+	 * @param resistance float maximum blast resistance that can be removed at this position
+	 * @param chance float chance not to remove the block
+	 */
 	private void removeExplodedBlock(BlockPos pos, float resistance, float chance)
 	{
 		ObjectArrayList<Pair<ItemStack, BlockPos>> objectarraylist = new ObjectArrayList<>();

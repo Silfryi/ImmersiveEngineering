@@ -55,8 +55,6 @@ public class GunpowderBarrelEntity extends PrimedTnt
 	{
 		super(IEEntityTypes.EXPLOSIVE.get(), world);
 		this.setPos(pos.getX()+.5, pos.getY()+.5, pos.getZ()+.5);
-		double jumpingDirection = world.random.nextDouble()*2*Math.PI;
-		this.setDeltaMovement(-Math.sin(jumpingDirection)*0.02D, 0.2, -Math.cos(jumpingDirection)*0.02D);
 		this.setFuse(80);
 		this.xo = getX();
 		this.yo = getY();
@@ -168,7 +166,7 @@ public class GunpowderBarrelEntity extends PrimedTnt
 		{
 			this.discard();
 			if(!this.level().isClientSide()) {
-				Explosion explosion = new DirectionalMiningExplosion(level(), this, getX(), getY() + (getBbHeight() / 16f), getZ(), isFlaming);
+				Explosion explosion = new DirectionalMiningExplosion(level(), this, getX(), getY(), getZ(), isFlaming);
 				if (!EventHooks.onExplosionStart(level(), explosion)) {
 					explosion.explode();
 					explosion.finalizeExplosion(true);
