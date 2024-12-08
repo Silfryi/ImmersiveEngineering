@@ -40,9 +40,12 @@ import java.util.*;
 public class DirectionalMiningExplosion extends Explosion
 {
 	private static final int SIZE = 8;
-	private static final float BLASTING_LENGTH = 525;
-	private static final float SUBSURFACE_LENGTH = 700;
-	private static final float SUBSURFACE_RESISTANCE = 1500;
+	//private static final float BLASTING_LENGTH = 525;
+	//private static final float SUBSURFACE_LENGTH = 700;
+	//private static final float SUBSURFACE_RESISTANCE = 1500;
+	private static final float BLASTING_LENGTH = 125;
+	private static final float SUBSURFACE_LENGTH = 300;
+	private static final int THIRD_VOLUME = (int)((1.0/3)*(4.0/3)*Math.PI*SIZE*SIZE*SIZE);
 	private static final int MIN_AIR = 3;
 	private static final float MAX_SHOCKWAVE_RESISTANCE = 0.4f;
 	private static final float MAX_SURFACE_RESISTANCE = 1.75f;
@@ -65,6 +68,16 @@ public class DirectionalMiningExplosion extends Explosion
 	}
 
 	@Override
+	/**
+	 * This method is the entry method for starting the explosion, and does most of the pre-explosion calculation to assess explosion dynamics.
+	 * First, a spherical area is scanned around the entity, and four properties are collected:
+	 *     1. The total number of blocks in the area
+	 *     2. The total blast resistances of blocks in the area
+	 *     3. The sum of the vectors of all blocks in area of the form blast resistance divided by the distance from the center
+	 *     4. The sum of the vectors of all blocks in area of the form one divided by the distance from the center
+	 * These properties are then composed into a vector in which the explosion should propagate
+	 * Finally, a subtype (surface, subsurface, blasting) of explosion is selected based on these parameters, and DirectionalMiningExplosion#stagedExplosionDetonation() is called
+	 */
 	public void explode()
 	{
 		// variables used for the rest of the explosion
@@ -73,7 +86,9 @@ public class DirectionalMiningExplosion extends Explosion
 		// iteration to identify the basic characteristics of the explosion
 		// variables collated during the iteration
 		double totalResistance = 0;
+		int totalBlocks = 0;
 		Vec3 weaknesses = new Vec3(0,0, 0);
+		Vec3 openSpace =  new Vec3(0,0, 0);
 		BlockState cBlock;
 		FluidState cFluid;
 		// iterate over an area of size (2*power+1)^3 and collect the resistance of blocks in a sphere around our center
@@ -90,17 +105,27 @@ public class DirectionalMiningExplosion extends Explosion
 						{
 							float resistance = cBlock.getExplosionResistance(world, pos, this)+cFluid.getExplosionResistance(world, pos, this);
 							totalResistance += resistance;
+							totalBlocks+=1;
 							weaknesses = weaknesses.add(x==0?0:resistance/x, y==0?0:resistance/y, z==0?0:resistance/z);
 						}
+						if(cBlock.canBeReplaced()&&cFluid.isEmpty())
+							openSpace = openSpace.add(x==0?0:1.0/x, y==0?0:1.0/y, z==0?0:1.0/z);
 					}
 				}
 		// establish the weakest direction and the length of the explosive step we should be taking
 		weaknesses = weaknesses.reverse();
+		Vec3 propagationDirection = openSpace;
+		propagationDirection = propagationDirection.add(weaknesses.scale(0.05));
+		System.out.println(openSpace + " " + weaknesses + " " + weaknesses.length() + " " + propagationDirection);
 		// handle explosion based on criteria for explosions: either surface, subsurface, or blasting
+		//System.out.println(weaknesses.scale(30*SIZE/totalResistance));
+		System.out.println(propagationDirection.length() + " " + THIRD_VOLUME);
 		int air = checkAir(centerBlock);
-		if(air<MIN_AIR&&weaknesses.length()<BLASTING_LENGTH)
-			stagedExplosionDetonation(centerBlock, weaknesses.scale(30*SIZE/totalResistance), 0.4f*SIZE, 0.4f*SIZE, MAX_BLASTING_RESISTANCE, true);
-		else if(air<=MIN_AIR&&weaknesses.length()<SUBSURFACE_LENGTH&&totalResistance>=SUBSURFACE_RESISTANCE)
+		if(air<MIN_AIR&&propagationDirection.length()<BLASTING_LENGTH&&totalBlocks>=THIRD_VOLUME) {
+			System.out.println("true");
+			stagedExplosionDetonation(centerBlock, weaknesses.scale(30 * SIZE / totalResistance), 0.4f * SIZE, 0.4f * SIZE, MAX_BLASTING_RESISTANCE, true);
+		}
+		else if(air<=MIN_AIR&&propagationDirection.length()<SUBSURFACE_LENGTH&&totalBlocks>=THIRD_VOLUME)
 			stagedExplosionDetonation(centerBlock, null, 3, SIZE*1.25f, MAX_SUBSURFACE_RESISTANCE, false);
 		else
 			stagedExplosionDetonation(centerBlock, null, 2, SIZE*2, MAX_SURFACE_RESISTANCE, false);
@@ -167,6 +192,17 @@ public class DirectionalMiningExplosion extends Explosion
 			removeExplodedBlock(pos);*/
 	}
 
+	/**
+	 * Actuates a directional explosion detonation using parameters calculated in DirectionalMiningExplosion#explode().
+	 * Multiple spheres of blocks are broken to correspond to different parts of the explosion, including a shockwave.
+	 * Blasting explosions create a 'cone' of removed material via two separate removal spheres
+	 * @param center BlockPos position that the center of the explosion is at
+	 * @param step Vec3 vector that the staged block break steps should move each iteration
+	 * @param crater float radius that the crater block break step should break out to
+	 * @param shockwave float radius of the shockwave step
+	 * @param resistance float maximum blast resistance the explosion can remove blocks of
+	 * @param blasting boolean whether the explosion should treat itself as a blasting explosion or a shockwave
+	 */
 	private void stagedExplosionDetonation(BlockPos center, Vec3 step, float crater, float shockwave, float resistance, boolean blasting)
 	{
 		// handle shockwave and crater block damage that come with any explosion

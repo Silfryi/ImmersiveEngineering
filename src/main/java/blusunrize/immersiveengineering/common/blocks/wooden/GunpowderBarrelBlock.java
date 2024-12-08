@@ -51,9 +51,12 @@ public class GunpowderBarrelBlock extends TntBlock
 	@Override
 	public void onCaughtFire(BlockState state, Level world, BlockPos pos, @org.jetbrains.annotations.Nullable Direction face, @org.jetbrains.annotations.Nullable LivingEntity igniter)
 	{
-		GunpowderBarrelEntity explosive = spawnExplosive(world, pos, state, igniter);
-		world.playSound(null, explosive.getX(), explosive.getY(), explosive.getZ(), SoundEvents.TNT_PRIMED, SoundSource.BLOCKS, 1.0F, 1.0F);
-		world.removeBlock(pos, false);
+		if(!world.isClientSide)
+		{
+			GunpowderBarrelEntity explosive = spawnExplosive(world, pos, state, igniter);
+			world.playSound(null, explosive.getX(), explosive.getY(), explosive.getZ(), SoundEvents.TNT_PRIMED, SoundSource.BLOCKS, 1.0F, 1.0F);
+			world.removeBlock(pos, false);
+		}
 	}
 
 	@Override
