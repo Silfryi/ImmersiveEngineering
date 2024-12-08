@@ -40,10 +40,7 @@ import java.util.*;
 public class DirectionalMiningExplosion extends Explosion
 {
 	private static final int SIZE = 8;
-	//private static final float BLASTING_LENGTH = 525;
-	//private static final float SUBSURFACE_LENGTH = 700;
-	//private static final float SUBSURFACE_RESISTANCE = 1500;
-	private static final float BLASTING_LENGTH = 125;
+	private static final float BLASTING_LENGTH = 150;
 	private static final float SUBSURFACE_LENGTH = 300;
 	private static final int THIRD_VOLUME = (int)((1.0/3)*(4.0/3)*Math.PI*SIZE*SIZE*SIZE);
 	private static final int MIN_AIR = 3;
@@ -116,80 +113,16 @@ public class DirectionalMiningExplosion extends Explosion
 		weaknesses = weaknesses.reverse();
 		Vec3 propagationDirection = openSpace;
 		propagationDirection = propagationDirection.add(weaknesses.scale(0.05));
-		System.out.println(openSpace + " " + weaknesses + " " + weaknesses.length() + " " + propagationDirection);
+		Vec3 step = propagationDirection.scale((0.5*SIZE+1-Math.sqrt(propagationDirection.length()/SIZE))/propagationDirection.length());
+		System.out.println(step + " " + openSpace.scale((0.5*SIZE+1-Math.sqrt(openSpace.length()/SIZE))/openSpace.length())  + " " + weaknesses + " " + openSpace + " " + propagationDirection);
 		// handle explosion based on criteria for explosions: either surface, subsurface, or blasting
-		//System.out.println(weaknesses.scale(30*SIZE/totalResistance));
-		System.out.println(propagationDirection.length() + " " + THIRD_VOLUME);
 		int air = checkAir(centerBlock);
-		if(air<MIN_AIR&&propagationDirection.length()<BLASTING_LENGTH&&totalBlocks>=THIRD_VOLUME) {
-			System.out.println("true");
-			stagedExplosionDetonation(centerBlock, weaknesses.scale(30 * SIZE / totalResistance), 0.4f * SIZE, 0.4f * SIZE, MAX_BLASTING_RESISTANCE, true);
-		}
+		if(air<MIN_AIR&&propagationDirection.length()<BLASTING_LENGTH&&totalBlocks>=THIRD_VOLUME)
+			stagedExplosionDetonation(centerBlock, step, 0.4f * SIZE, 0.4f * SIZE, MAX_BLASTING_RESISTANCE, true);
 		else if(air<=MIN_AIR&&propagationDirection.length()<SUBSURFACE_LENGTH&&totalBlocks>=THIRD_VOLUME)
 			stagedExplosionDetonation(centerBlock, null, 3, SIZE*1.25f, MAX_SUBSURFACE_RESISTANCE, false);
 		else
 			stagedExplosionDetonation(centerBlock, null, 2, SIZE*2, MAX_SURFACE_RESISTANCE, false);
-
-
-
-
-
-		//Vec3 step = weaknesses.scale(30*size/totalResistance);
-/*
-		// find entities in range and set them into the list to damage them
-		// TODO: this should scale with 1/explosion radius
-		double shock = 0.75f*size;
-		List<Entity> damage = new ArrayList<>(world.getEntities(this.getDirectSourceEntity(),
-				new AABB(centerBlock.getX()-shock, centerBlock.getY()-shock, centerBlock.getZ()-shock,
-						centerBlock.getX()+shock, centerBlock.getY()+shock, centerBlock.getZ()+shock)));
-		// filter for radius, then filter out items
-		damage = damage.stream().filter(e -> center.distanceTo(e.position())<=shock).filter(e -> !(e instanceof ItemEntity)).toList();
-		// offset center to be used in other calculations
-		BlockPos centerOffset;
-		// if step length is high we have a "surface burst" and the explosion dynamics should be different
-		if (step.length()>size*5)
-		{
-			// offset explosion by fixed distance proportional to size
-			step = step.normalize().scale(size/4);
-			centerOffset = centerBlock.offset((int)step.x, (int)step.y, (int)step.z);
-			int r = (int)(0.6f*power);
-			for(int x = -r; x <= r; x++)
-				for(int y = -r; y <= r; y++)
-					for(int z = -r; z <= r; z++)
-						addToRemoveRandom(centerOffset.offset(x, y, z), r-1, r, (new Vec3(x, y, z)).length(), 0.1f);
-		}
-		// otherwise proceed with embedded explosion dynamics
-		else
-		{
-=			// if we have a step length greater than ~0.6 power we need to scale it down a little bit because we still have penetration
-			if (step.length()>size*0.6) step = step.scale(1.75/Math.pow(step.length(), 0.7f));
-			// if we have a step length smaller than ~0.225 power but aren't on a surface explosion, we should enhance it
-			else if (step.length()<size*0.225) step = step.scale(1.3f);
-=			// delineate blocks to break from the first "stage", ie the explosion directly around the barrel
-			int r1 = (int)(0.4f*power);
-			for(int x = -r1; x <= r1; x++)
-				for(int y = -r1; y <= r1; y++)
-					for(int z = -r1; z <= r1; z++)
-						addToRemoveRandom(centerBlock.offset(x, y, z), r1-1, r1, (new Vec3(x, y, z)).length(), 0.05f);
-			// run the second and third stages, 'biased' explosions that are larger and make this a directional charge
-			centerOffset = centerBlock.offset((int)step.x, (int)step.y, (int)step.z);
-			int r2 = (int)(0.5f*power);
-			for(int x = -r2; x <= r2; x++)
-				for(int y = -r2; y <= r2; y++)
-					for(int z = -r2; z <= r2; z++)
-						addToRemoveRandom(centerOffset.offset(x, y, z), r2-1, r2, (new Vec3(x, y, z)).length(), 0.075f);
-			centerOffset = centerBlock.offset((int)step.x*2, (int)step.y*2, (int)step.z*2);
-			int r3 = (int)(0.6f*power);
-			for(int x = -r3; x <= r3; x++)
-				for(int y = -r3; y <= r3; y++)
-					for(int z = -r3; z <= r3; z++)
-						addToRemoveRandom(centerOffset.offset(x, y, z), r3-1, r3, (new Vec3(x, y, z)).length(), 0.1f);
-		}
-
-		// remove blocks & damage entities
-		damageEntities(damage, totalResistance);
-		for (BlockPos pos : remove)
-			removeExplodedBlock(pos);*/
 	}
 
 	/**
@@ -228,11 +161,6 @@ public class DirectionalMiningExplosion extends Explosion
 		// handle directional explosions that come with a buried explosive barrel
 		if(blasting)
 		{
-			//scale weakness shatter vector into something to 'step' explosions by
-			if (step.length()>SIZE*0.6)
-				step = step.scale(1.75/Math.pow(step.length(), 0.7f));
-			else if (step.length()<SIZE*0.225)
-				step = step.scale(1.3f);
 			// first explosion propagation sphere
 			BlockPos centerOffset = center.offset((int)step.x(), (int)step.y(), (int)step.z());
 			int blast1 = (int)(crater*1.25f);
