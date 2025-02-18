@@ -92,7 +92,7 @@ public class IEBullets
 		});
 
 		BulletHandler.registerBullet(HIGH_EXPLOSIVE, new BulletHandler.DamagingBullet<>(
-				CodecsAndDefault.UNIT, null, 0, () -> BulletHandler.emptyCasing.asItem().getDefaultInstance(), IEApi.ieLoc("item/bullet_he")
+				CodecsAndDefault.UNIT, null, 0, () -> BulletHandler.emptyShell.asItem().getDefaultInstance(), IEApi.ieLoc("item/bullet_he")
 		)
 		{
 			@Override
