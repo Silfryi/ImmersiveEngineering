@@ -94,7 +94,7 @@ public class ArcFurnaceRecipe extends MultiblockRecipe
 			actualOutput.set(i, output.get(i).copy());
 		for(StackWithChance secondary : secondaryOutputs)
 		{
-			if(secondary.chance() > random.nextFloat())
+			if(secondary.chance() < random.nextFloat())
 				continue;
 			ItemStack remaining = secondary.stack().get();
 			for(ItemStack existing : actualOutput)
